@@ -1,0 +1,26 @@
+# System files
+Thumbs.db
+Desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+
+# Agent files
+.gemini/
+brain/
+*.log
+
+# Dependencies
+node_modules/
+vendor/
+
+# Database / Sensitive
+# Note: Keeping database.sql for initial setup as per user context
+# api/config.php (Optional: keep if it contains generic localhost settings)
+
+# Local test scripts
+test_logic.js
+test_auth.js
+test_endpoint.js
+test_results.json
