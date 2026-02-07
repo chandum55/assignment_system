@@ -1,0 +1,23 @@
+{
+    "name": "GradeFlow Cloud Environment",
+    "dockerComposeFile": "../docker-compose.yml",
+    "service": "web",
+    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+    "features": {
+        "ghcr.io/devcontainers/features/mysql:1": {}
+    },
+    "postCreateCommand": "bash .devcontainer/setup.sh",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "bmewburn.vscode-intelephense-client",
+                "xdebug.php-debug",
+                "ritwickdey.LiveServer"
+            ]
+        }
+    },
+    "forwardPorts": [
+        80,
+        3306
+    ]
+}
