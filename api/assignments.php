@@ -7,8 +7,15 @@ $method = $_SERVER['REQUEST_METHOD'];
 if ($method === 'GET') {
     $department = $_GET['department'] ?? null;
     $faculty_id = $_GET['faculty_id'] ?? null;
+    $id = $_GET['id'] ?? null;
 
-    if ($faculty_id) {
+    if ($id) {
+        $stmt = $conn->prepare("SELECT * FROM assignments WHERE id = ?");
+        $stmt->execute([$id]);
+        echo json_encode($stmt->fetch(PDO::FETCH_ASSOC));
+        exit();
+    }
+    elseif ($faculty_id) {
         $stmt = $conn->prepare("SELECT * FROM assignments WHERE faculty_id = ?");
         $stmt->execute([$faculty_id]);
     }

@@ -19,9 +19,13 @@ Options -Indexes
 
 # 4. Handle Uploads Security
 # Prevent execution of scripts in the uploads folder
-<Directory "uploads">
-    <FilesMatch "\.(php|phtml|php3|php4|php5|phps)$">
-        Order Allow,Deny
-        Deny from all
-    </FilesMatch>
-</Directory>
+# This rule is already inside the project root, so we check the uploads path
+<IfModule mod_rewrite.c>
+    RewriteRule ^uploads/.*\.php$ - [F,L]
+</IfModule>
+
+# Alternative if mod_rewrite isn't used (Direct match)
+<FilesMatch "^uploads/.*\.(php|phtml|php3|php4|php5|phps)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>

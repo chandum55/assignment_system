@@ -1,11 +1,22 @@
 // --- State Management ---
 
 // Global State
-let currentUser = JSON.parse(localStorage.getItem('currentUser')) || null;
+let currentUser = null;
+try {
+    const saved = localStorage.getItem('currentUser');
+    if (saved && saved !== 'undefined' && saved !== 'null') {
+        currentUser = JSON.parse(saved);
+    }
+} catch (e) {
+    console.warn('Could not parse currentUser from localStorage', e);
+    localStorage.removeItem('currentUser');
+}
+
 let currentView = currentUser ? 'dashboard' : 'landing';
 
-const app = document.getElementById('main-content');
-const navActions = document.getElementById('nav-actions');
+// Elements will be retrieved when needed to ensure they exist
+const getApp = () => document.getElementById('main-content');
+const getNavActions = () => document.getElementById('nav-actions');
 
 const API_BASE = 'api';
 
@@ -41,36 +52,71 @@ function showNotification(message, type = 'success') {
     setTimeout(() => note.remove(), 4000);
 }
 
+window.setView = (view) => {
+    currentView = view;
+    render();
+};
+
+function renderNavbar() {
+    const navActions = getNavActions();
+    if (!navActions) return;
+
+    if (currentUser) {
+        navActions.innerHTML = `
+            <div style="display:flex; align-items:center; gap:1.5rem">
+                <span class="text-sm" style="color:white">
+                    <i data-lucide="user" style="width:14px; display:inline; margin-right:0.4rem"></i>
+                    ${currentUser.role}: <strong>${currentUser.name}</strong>
+                </span>
+                <button class="btn btn-outline" onclick="logout()" style="padding:0.4rem 1rem; font-size:0.875rem">
+                    <i data-lucide="log-out"></i> Logout
+                </button>
+            </div>
+        `;
+    } else {
+        navActions.innerHTML = `
+            <button class="btn btn-outline" onclick="setView('auth')" style="padding:0.4rem 1rem; font-size:0.875rem">Login</button>
+        `;
+    }
+}
+
 // --- Component Rendering ---
 
 async function render() {
-    renderNavbar();
+    try {
+        renderNavbar();
 
-    // View Router
-    if (currentView === 'landing') {
-        renderLanding();
-    } else if (currentView === 'auth') {
-        renderAuth();
-    } else if (currentView === 'register') {
-        renderRegister();
-    } else if (currentView === 'dashboard') {
-        if (!currentUser) {
-            setView('landing');
-            return;
+        // View Router
+        if (currentView === 'landing') {
+            renderLanding();
+        } else if (currentView === 'auth') {
+            renderAuth();
+        } else if (currentView === 'register') {
+            renderRegister();
+        } else if (currentView === 'dashboard') {
+            if (!currentUser) {
+                setView('landing');
+                return;
+            }
+            if (currentUser.role === 'Student') {
+                await renderStudentDashboard();
+            } else {
+                await renderFacultyDashboard();
+            }
         }
-        if (currentUser.role === 'Student') {
-            await renderStudentDashboard();
-        } else {
-            await renderFacultyDashboard();
-        }
+
+        if (window.lucide) lucide.createIcons();
+    } catch (e) {
+        console.error('Render Error:', e);
+        showNotification('An error occurred during rendering. Check console for details.', 'danger');
     }
-
-    if (window.lucide) lucide.createIcons();
 }
 
 // --- Views ---
 
 function renderLanding() {
+    const app = getApp();
+    if (!app) return;
     app.innerHTML = `
         <section class="hero">
             <div class="hero-text">
@@ -123,6 +169,8 @@ function renderLanding() {
 }
 
 function renderAuth() {
+    const app = getApp();
+    if (!app) return;
     app.innerHTML = `
         <div class="auth-wrapper">
             <div class="auth-card card">
@@ -155,6 +203,8 @@ function renderAuth() {
 }
 
 function renderRegister() {
+    const app = getApp();
+    if (!app) return;
     app.innerHTML = `
         <div class="auth-wrapper">
             <div class="auth-card card">
@@ -207,6 +257,8 @@ function renderRegister() {
 }
 
 async function renderStudentDashboard() {
+    const app = getApp();
+    if (!app) return;
     const assignments = await apiFetch(`assignments.php?department=${encodeURIComponent(currentUser.department)}`);
     const submissions = await apiFetch(`submissions.php?student_id=${currentUser.id}`);
 
@@ -302,6 +354,8 @@ async function renderStudentDashboard() {
 }
 
 async function renderFacultyDashboard() {
+    const app = getApp();
+    if (!app) return;
     const assignments = await apiFetch(`assignments.php?faculty_id=${currentUser.id}`);
 
     const assignmentList = assignments.map(a => `
@@ -429,7 +483,7 @@ window.openCreateAssignment = () => {
                             <i data-lucide="upload" style="margin-bottom:0.5rem"></i>
                             <p id="q-file-name" class="text-sm" style="color:var(--gray-text)">Click to upload question file</p>
                         </div>
-                        <input type="file" id="q-file" name="questionFile" accept=".pdf,.doc,.docx" required style="display:none" onchange="document.getElementById('q-file-name').innerText = this.files[0]?.name || 'Click to upload question file'">
+                        <input type="file" id="q-file" name="question_file" accept=".pdf,.doc,.docx" required style="display:none" onchange="document.getElementById('q-file-name').innerText = this.files[0]?.name || 'Click to upload question file'">
                     </div>
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem; margin-bottom:1.5rem">
                         <div>
@@ -587,9 +641,15 @@ window.handleEvaluation = async (e, submissionId) => {
 
 // --- Student Features ---
 
-window.openSubmission = (assignmentId) => {
-    const assignments = JSON.parse(localStorage.getItem('assignments'));
-    const assignment = assignments.find(a => a.id === assignmentId);
+window.openSubmission = async (assignmentId) => {
+    // Fetch assignment details since we don't have them in global state
+    const assignments = await apiFetch(`assignments.php?id=${assignmentId}`);
+    const assignment = Array.isArray(assignments) ? assignments.find(a => parseInt(a.id) === parseInt(assignmentId)) : assignments;
+
+    if (!assignment) {
+        showNotification("Assignment not found", "danger");
+        return;
+    }
 
     // Validate Deadline again (Server-side simulation)
     if (new Date() > new Date(assignment.deadline)) {
